@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
+import { useValue } from 'react-cosmos/client'
 import { AI } from '../AI'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { cn } from '../utils/styles'
@@ -24,50 +25,25 @@ const blogSchema = z.object({
 
 type BlogProps = z.infer<typeof blogSchema>
 
-export default {
-  'Grid Layout (3 Columns)': (
+const BlogFixture = () => {
+  const [model] = useValue('model', { defaultValue: 'gpt-4o' })
+  const [count] = useValue('count', { defaultValue: 6 })
+  const [cols] = useValue('cols', { defaultValue: 3 })
+  const [prompt] = useValue('prompt', {
+    defaultValue: 'Generate engaging blog post previews about AI and machine learning topics.'
+  })
+
+  return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <Suspense fallback={<LoadingFallback />}>
         <AI
-          model={openai('gpt-4o')}
+          model={openai(model)}
           schema={blogSchema}
           output="array"
-          count={6}
-          cols={3}
+          count={count}
+          cols={cols}
           className="gap-6"
-          prompt="Generate engaging blog post previews about AI and machine learning topics."
-        >
-          {(props: BlogProps) => (
-            <div className={cn('blog-card', 'p-4 border rounded-lg')}>
-              <h2>{props.title}</h2>
-              <p>{props.excerpt}</p>
-              <div className="meta">
-                <span>{props.readTime}</span>
-                <span>{props.category}</span>
-              </div>
-              <div className="tags">
-                {props.tags.map((tag, i) => (
-                  <span key={i} className="tag">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </AI>
-      </Suspense>
-    </ErrorBoundary>
-  ),
-  'List Layout': (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>
-      <Suspense fallback={<LoadingFallback />}>
-        <AI
-          model={openai('gpt-4o')}
-          schema={blogSchema}
-          output="array"
-          count={3}
-          className="space-y-4"
-          prompt="Generate engaging blog post previews about AI and machine learning topics."
+          prompt={prompt}
         >
           {(props: BlogProps) => (
             <div className={cn('blog-card', 'p-4 border rounded-lg')}>
@@ -90,4 +66,8 @@ export default {
       </Suspense>
     </ErrorBoundary>
   )
+}
+
+export default {
+  'Editable Blog List': <BlogFixture />
 }
