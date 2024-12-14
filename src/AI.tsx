@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
@@ -30,7 +30,7 @@ export function AI<T>({
   prompt,
   schema,
   model = defaultModel,
-  output = 'object',
+  output,
   schemaName,
   schemaDescription,
   mode = 'auto',
@@ -47,14 +47,14 @@ export function AI<T>({
           model,
           prompt,
           schema,
-          output,
-          schemaName,
-          schemaDescription,
-          mode,
-          experimental_telemetry,
-          experimental_providerMetadata
+          ...(output && { output }),
+          ...(schemaName && { schemaName }),
+          ...(schemaDescription && { schemaDescription }),
+          ...(mode && { mode }),
+          ...(experimental_telemetry && { experimental_telemetry }),
+          ...(experimental_providerMetadata && { experimental_providerMetadata })
         })
-        setResult(response.object)
+        setResult(await response.object)
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Unknown error'))
       }
