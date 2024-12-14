@@ -5,40 +5,36 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, './src')
-    }
+  server: {
+    port: 5050,
+    strictPort: true
   },
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'ai-props',
+      formats: ['es', 'umd'],
       fileName: (format) => `ai-props.${format}.js`
     },
     rollupOptions: {
-      external: ['react', 'react-dom', 'ai', '@ai-sdk/openai'],
+      external: ['react', 'react-dom', 'ai', '@ai-sdk/openai', 'clsx', 'tailwind-merge'],
       output: {
         globals: {
           react: 'React',
           'react-dom': 'ReactDOM',
           ai: 'ai',
-          '@ai-sdk/openai': 'aiSdkOpenai'
+          '@ai-sdk/openai': 'aiSdkOpenai',
+          clsx: 'clsx',
+          'tailwind-merge': 'tailwindMerge'
         }
       }
     }
   },
+  optimizeDeps: {
+    include: ['ai', '@ai-sdk/openai', 'clsx', 'tailwind-merge']
+  },
   test: {
     environment: 'jsdom',
-    globals: true,
     setupFiles: ['./src/test/setup.ts']
-  },
-  server: {
-    hmr: {
-      overlay: false
-    }
-  },
-  optimizeDeps: {
-    include: ['react', 'react-dom', 'ai', '@ai-sdk/openai']
   }
 })

@@ -2,10 +2,5 @@
   "staticPath": "public",
   "exportPath": "cosmos-export",
   "watchDirs": ["src"],
-  "plugins": [
-    "react-cosmos-plugin-vite"
-  ],
-  "vite": {
-    "configPath": "vite.config.ts"
-  }
+  "plugins": ["react-cosmos-plugin-vite"]
 }
