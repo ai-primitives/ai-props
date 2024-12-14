@@ -25,6 +25,7 @@ type AIProps<T> = {
   schema: z.ZodSchema<T> | SchemaObject
   model?: typeof defaultModel
   output?: 'object' | 'array'
+  count?: number // Number of items to generate in array mode
   cols?: number
   gap?: string
   className?: string
@@ -42,6 +43,7 @@ export function AI<T>({
   schema: rawSchema,
   model = defaultModel,
   output = 'object',
+  count,
   cols,
   gap = '1rem',
   className,
@@ -71,7 +73,7 @@ export function AI<T>({
         const response = await generateObject({
           model,
           prompt: output === 'array'
-            ? `Generate an array of ${cols || 3} items. ${prompt}`
+            ? `Generate an array of ${count || cols || 3} items. ${prompt}`
             : prompt,
           output: 'no-schema',
           mode,
@@ -81,8 +83,8 @@ export function AI<T>({
 
         const responseObject = response.object as Record<string, unknown>
         const parsed = output === 'array'
-          ? ('items' in responseObject && Array.isArray(responseObject.items)
-              ? responseObject.items.map(item => schema.parse(item))
+          ? (Array.isArray(responseObject)
+              ? responseObject.map(item => schema.parse(item))
               : [])
           : [schema.parse(responseObject)]
 
@@ -93,7 +95,7 @@ export function AI<T>({
     }
 
     generateProps()
-  }, [prompt, schema, model, output, cols, gap, className, schemaName, schemaDescription, mode, experimental_telemetry, experimental_providerMetadata])
+  }, [prompt, schema, model, output, count, cols, gap, className, schemaName, schemaDescription, mode, experimental_telemetry, experimental_providerMetadata])
 
   if (error) {
     throw error
