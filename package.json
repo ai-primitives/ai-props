@@ -1,6 +1,6 @@
 {
   "name": "ai-props",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Magic AI Prop Generation",
   "type": "module",
   "main": "./dist/ai-props.umd.js",

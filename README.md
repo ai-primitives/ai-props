@@ -11,8 +11,23 @@ npm install ai-props
 ## Dependencies
 
 This package requires the following peer dependencies:
-- `ai`
-- `@ai-sdk/openai`
+- `react` (^18.2.0)
+- `react-dom` (^18.2.0)
+- `@types/react` (^18.2.0)
+- `@types/react-dom` (^18.2.0)
+
+And the following runtime dependencies:
+- `ai` (^4.0.18)
+- `@ai-sdk/openai` (^1.0.8)
+- `clsx` (^2.1.1)
+- `tailwind-merge` (^2.5.5)
+- `zod` (^3.22.4)
+
+Make sure to install these dependencies if they're not already in your project:
+
+```bash
+npm install ai @ai-sdk/openai clsx tailwind-merge zod
+```
 
 ## Usage
 

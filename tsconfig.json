@@ -13,6 +13,8 @@
     "isolatedModules": true,
     "noEmit": false,
     "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "typeRoots": ["./node_modules/@types", "./src/types"],
 
     /* Linting */
     "strict": true,
