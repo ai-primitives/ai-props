@@ -4,5 +4,11 @@
   "watchDirs": ["src"],
   "vite": {
     "configPath": "vite.config.ts"
+  },
+  "ui": {
+    "port": 5000
+  },
+  "renderer": {
+    "port": 5050
   }
 }
