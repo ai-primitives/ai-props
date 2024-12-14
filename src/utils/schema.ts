@@ -10,10 +10,11 @@ export type SchemaShape = {
   profile: ProfileObject
   description: string
   tags: string[]
+  [key: string]: unknown
 }
 
 export interface SchemaObject extends SchemaShape {
-  [key: string]: string | string[] | ProfileObject | undefined
+  [key: string]: string | string[] | ProfileObject | Record<string, unknown> | unknown
 }
 
 export type SchemaZodShape = {
@@ -24,22 +25,28 @@ export type SchemaZodShape = {
   }>
   description: z.ZodString
   tags: z.ZodArray<z.ZodString>
+  [key: string]: z.ZodTypeAny
 }
 
 function convertToZodSchema(schema: SchemaObject): z.ZodObject<SchemaZodShape> {
-  const zodSchema = {
-    productType: typeof schema.productType === 'string' && schema.productType.includes('|')
-      ? z.enum(schema.productType.split('|').map(v => v.trim()) as [string, ...string[]]).describe(schema.productType)
-      : z.string().describe(schema.productType),
-    profile: z.object({
-      customer: z.string().describe(schema.profile.customer),
-      solution: z.string().describe(schema.profile.solution)
-    }),
-    description: z.string().describe(schema.description),
-    tags: z.array(z.string()).describe(schema.tags.join(', '))
-  } satisfies SchemaZodShape
+  const zodSchema: Record<string, z.ZodTypeAny> = {}
 
-  return z.object(zodSchema)
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === 'profile' && typeof value === 'object' && value !== null && 'customer' in value && 'solution' in value) {
+      zodSchema[key] = z.object({
+        customer: z.string().describe((value as ProfileObject).customer),
+        solution: z.string().describe((value as ProfileObject).solution)
+      })
+    } else if (Array.isArray(value)) {
+      zodSchema[key] = z.array(z.string()).describe(value.join(', '))
+    } else if (typeof value === 'string') {
+      zodSchema[key] = value.includes('|')
+        ? z.enum(value.split('|').map(v => v.trim()) as [string, ...string[]]).describe(value)
+        : z.string().describe(value)
+    }
+  }
+
+  return z.object(zodSchema) as z.ZodObject<SchemaZodShape>
 }
 
 export function createSchemaFromObject(schema: SchemaObject): z.ZodObject<SchemaZodShape> {

@@ -5,7 +5,8 @@ import { z } from 'zod'
 import type { LanguageModelV1ProviderMetadata } from '@ai-sdk/provider'
 import type { AttributeValue } from '@opentelemetry/api'
 import { createSchemaFromObject, isZodSchema } from './utils/schema'
-import type { SchemaObject, SchemaShape } from './utils/schema'
+import type { SchemaObject } from './utils/schema'
+import { cn } from './utils/styles'
 
 // Default model configuration
 const defaultModel = openai('gpt-4o')
@@ -19,11 +20,15 @@ type TelemetrySettings = {
 }
 
 type AIProps<T> = {
-  children: (props: T extends SchemaObject ? SchemaShape : T) => ReactNode
+  children: (props: T) => ReactNode
   prompt: string
   schema: z.ZodSchema<T> | SchemaObject
   model?: typeof defaultModel
-  output?: 'no-schema'
+  output?: 'object' | 'array'
+  cols?: number
+  gap?: string
+  className?: string
+  itemClassName?: string
   schemaName?: string
   schemaDescription?: string
   mode?: 'json'
@@ -36,50 +41,75 @@ export function AI<T>({
   prompt,
   schema: rawSchema,
   model = defaultModel,
-  output = 'no-schema',
+  output = 'object',
+  cols,
+  gap = '1rem',
+  className,
+  itemClassName,
   schemaName,
   schemaDescription,
   mode = 'json',
   experimental_telemetry,
   experimental_providerMetadata,
 }: AIProps<T>) {
-  type ResultType = T extends SchemaObject ? SchemaShape : T
-  const [result, setResult] = useState<ResultType | null>(null)
+  const [results, setResults] = useState<T[]>([])
   const [error, setError] = useState<Error | null>(null)
 
   const schema = isZodSchema(rawSchema)
-    ? rawSchema as z.ZodSchema<ResultType>
-    : createSchemaFromObject(rawSchema as SchemaObject) as unknown as z.ZodSchema<ResultType>
+    ? rawSchema as z.ZodSchema<T>
+    : createSchemaFromObject(rawSchema as SchemaObject) as unknown as z.ZodSchema<T>
+
+  const gridStyle = output === 'array' ? {
+    display: 'grid',
+    gridTemplateColumns: `repeat(${cols || 1}, minmax(0, 1fr))`,
+    gap,
+  } : undefined
 
   useEffect(() => {
     const generateProps = async () => {
       try {
         const response = await generateObject({
           model,
-          prompt,
-          output: 'no-schema' as const,
-          mode: 'json' as const,
+          prompt: output === 'array'
+            ? `Generate an array of ${cols || 3} items. ${prompt}`
+            : prompt,
+          output: 'no-schema',
+          mode,
           ...(experimental_telemetry && { experimental_telemetry }),
           ...(experimental_providerMetadata && { experimental_providerMetadata }),
         })
 
-        const parsed = schema.parse(response.object)
-        setResult(parsed as ResultType)
+        const responseObject = response.object as Record<string, unknown>
+        const parsed = output === 'array'
+          ? ('items' in responseObject && Array.isArray(responseObject.items)
+              ? responseObject.items.map(item => schema.parse(item))
+              : [])
+          : [schema.parse(responseObject)]
+
+        setResults(parsed)
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Unknown error'))
       }
     }
 
     generateProps()
-  }, [prompt, schema, model, output, schemaName, schemaDescription, mode, experimental_telemetry, experimental_providerMetadata])
+  }, [prompt, schema, model, output, cols, gap, className, schemaName, schemaDescription, mode, experimental_telemetry, experimental_providerMetadata])
 
   if (error) {
     throw error
   }
 
-  if (!result) {
+  if (!results.length) {
     return null
   }
 
-  return children(result)
+  return output === 'array' ? (
+    <div style={gridStyle} className={cn('ai-grid', className)}>
+      {results.map((result, index) => (
+        <div key={index} className={cn('ai-grid-item', itemClassName)}>
+          {children(result)}
+        </div>
+      ))}
+    </div>
+  ) : children(results[0])
 }
