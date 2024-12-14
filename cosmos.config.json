@@ -9,9 +9,9 @@
     "configPath": "vite.config.ts"
   },
   "ui": {
-    "port": 5000
+    "port": 5001
   },
   "renderer": {
-    "port": 5050
+    "port": 5051
   }
 }
