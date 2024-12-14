@@ -7,11 +7,5 @@
   ],
   "vite": {
     "configPath": "vite.config.ts"
-  },
-  "ui": {
-    "port": 5001
-  },
-  "renderer": {
-    "port": 5051
   }
 }

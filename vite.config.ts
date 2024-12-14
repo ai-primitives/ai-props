@@ -34,10 +34,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts']
   },
   server: {
-    port: 5051,
-    strictPort: true,
     hmr: {
-      port: 5051,
       overlay: false
     }
   },
