@@ -6,16 +6,20 @@ import { z } from 'zod'
 
 describe('AI', () => {
   it('renders children with generated props', async () => {
+    type TestProps = {
+      title: string
+    }
+
     const schema = z.object({
       title: z.string()
     })
 
     const { container } = render(
-      <AI
+      <AI<TestProps>
         schema={schema}
         prompt='Generate a title'
       >
-        {(props) => <h1>{props.title}</h1>}
+        {(props: TestProps) => <h1>{props.title}</h1>}
       </AI>
     )
 

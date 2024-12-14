@@ -30,7 +30,7 @@ export function AI<T>({
   prompt,
   schema,
   model = defaultModel,
-  output,
+  output = 'object',
   schemaName,
   schemaDescription,
   mode = 'auto',
@@ -46,15 +46,17 @@ export function AI<T>({
         const response = await generateObject({
           model,
           prompt,
-          schema,
-          ...(output && { output }),
+          output: 'no-schema' as const,
+          mode,
           ...(schemaName && { schemaName }),
           ...(schemaDescription && { schemaDescription }),
-          ...(mode && { mode }),
           ...(experimental_telemetry && { experimental_telemetry }),
           ...(experimental_providerMetadata && { experimental_providerMetadata })
         })
-        setResult(await response.object)
+
+        // Parse the response with the provided schema
+        const parsed = schema.parse(response.object)
+        setResult(parsed)
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Unknown error'))
       }
