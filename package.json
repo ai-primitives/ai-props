@@ -39,7 +39,9 @@
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^25.0.1",
     "prettier": "^3.4.2",
+    "react": "^19.0.0",
     "react-cosmos": "^6.2.1",
+    "react-dom": "^19.0.0",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "vitest": "^2.1.8"
