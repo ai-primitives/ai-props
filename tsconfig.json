@@ -24,8 +24,11 @@
     "baseUrl": ".",
     "outDir": "dist",
     "declaration": true,
-    "emitDeclarationOnly": false
+    "emitDeclarationOnly": true,
+    "sourceMap": true,
+    "declarationMap": true
   },
-  "include": ["src"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test/**/*", "dist"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
