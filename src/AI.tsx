@@ -73,8 +73,8 @@ export function AI<T>({
           prompt: output === 'array'
             ? `Generate an array of ${cols || 3} items. ${prompt}`
             : prompt,
-          output: 'object',
-          mode: 'json' as const,
+          output: 'no-schema',
+          mode,
           ...(experimental_telemetry && { experimental_telemetry }),
           ...(experimental_providerMetadata && { experimental_providerMetadata }),
         })

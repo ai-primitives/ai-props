@@ -1,4 +1,3 @@
-import React from 'react'
 import { AI } from '../AI'
 import type { SchemaObject } from '../utils/schema'
 
