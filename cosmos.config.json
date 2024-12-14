@@ -4,5 +4,6 @@
   "watchDirs": ["src"],
   "vite": {
     "configPath": "vite.config.ts"
-  }
+  },
+  "plugins": ["react-cosmos-plugin-vite"]
 }
