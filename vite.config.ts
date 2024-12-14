@@ -5,6 +5,11 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src')
+    }
+  },
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
@@ -30,6 +35,13 @@ export default defineConfig({
   },
   server: {
     port: 5050,
-    strictPort: true
+    strictPort: true,
+    hmr: {
+      port: 5050,
+      overlay: false
+    }
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'ai', '@ai-sdk/openai']
   }
 })
