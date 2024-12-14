@@ -2,26 +2,54 @@
   "name": "ai-props",
   "version": "1.0.0",
   "description": "Magic AI Prop Generation",
-  "main": "index.js",
-  "scripts": {},
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "type": "module",
+  "main": "./dist/ai-props.umd.js",
+  "module": "./dist/ai-props.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/ai-props.es.js",
+      "require": "./dist/ai-props.umd.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test": "vitest",
+    "cosmos": "cosmos",
+    "cosmos:export": "cosmos-export"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.8",
     "ai": "^4.0.18"
   },
-  "exports": "./",
-  "files": "[\"dist\"]",
   "devDependencies": {
+    "@testing-library/react": "^16.1.0",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
     "prettier": "^3.4.2",
     "react-cosmos": "^6.2.1",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "vitest": "^2.1.8"
-  }
+  },
+  "keywords": [
+    "react",
+    "ai",
+    "props",
+    "openai",
+    "gpt"
+  ],
+  "author": "",
+  "license": "MIT"
 }
