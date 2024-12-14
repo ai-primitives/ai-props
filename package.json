@@ -1,0 +1,64 @@
+{
+  "name": "ai-props",
+  "version": "1.0.0",
+  "description": "Magic AI Prop Generation",
+  "type": "module",
+  "main": "./dist/ai-props.umd.js",
+  "module": "./dist/ai-props.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/ai-props.es.js",
+      "require": "./dist/ai-props.umd.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && tsc --emitDeclarationOnly",
+    "test": "vitest",
+    "cosmos": "cosmos",
+    "cosmos:export": "cosmos-export",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\""
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^1.0.8",
+    "ai": "^4.0.18"
+  },
+  "devDependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^14.1.0",
+    "@types/node": "^20.10.2",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^22.1.0",
+    "prettier": "^3.4.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-cosmos": "^6.0.0",
+    "typescript": "^5.3.2",
+    "vite": "^5.0.2",
+    "vitest": "^1.0.2",
+    "zod": "^3.22.4"
+  },
+  "keywords": [
+    "react",
+    "ai",
+    "props",
+    "openai",
+    "gpt"
+  ],
+  "author": "",
+  "license": "MIT"
+}

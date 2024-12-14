@@ -1,0 +1,9 @@
+{
+  "staticPath": "public",
+  "exportPath": "cosmos-export",
+  "watchDirs": ["src"],
+  "webpack": {
+    "configPath": "webpack.config.js",
+    "overridePath": "webpack.override.js"
+  }
+}
