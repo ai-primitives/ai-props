@@ -1,0 +1,21 @@
+{
+  "name": "ai-props",
+  "version": "1.0.0",
+  "description": "Magic AI Prop Generation",
+  "main": "index.js",
+  "scripts": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@ai-sdk/openai": "^1.0.8",
+    "ai": "^4.0.18"
+  },
+  "exports": "./",
+  "files": "[\"dist\"]",
+  "devDependencies": {
+    "@types/react": "^19.0.1",
+    "typescript": "^5.7.2"
+  }
+}
