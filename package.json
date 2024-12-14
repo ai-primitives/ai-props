@@ -24,11 +24,20 @@
     "cosmos:export": "cosmos-export",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\""
   },
+  "release": {
+    "branches": ["main"],
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/npm",
+      "@semantic-release/github"
+    ]
+  },
   "peerDependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0"
+    "@types/react-dom": "^18.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.8",
@@ -36,6 +45,10 @@
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
+    "@semantic-release/commit-analyzer": "^13.0.0",
+    "@semantic-release/github": "^11.0.1",
+    "@semantic-release/npm": "^12.0.1",
+    "@semantic-release/release-notes-generator": "^14.0.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^14.1.0",
     "@types/node": "^20.10.2",
@@ -45,8 +58,9 @@
     "jsdom": "^22.1.0",
     "prettier": "^3.4.2",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "react-cosmos": "^6.0.0",
+    "react-dom": "^18.2.0",
+    "semantic-release": "^24.2.0",
     "typescript": "^5.3.2",
     "vite": "^5.0.2",
     "vitest": "^1.0.2",

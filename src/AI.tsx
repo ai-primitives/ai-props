@@ -4,6 +4,8 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import type { LanguageModelV1ProviderMetadata } from '@ai-sdk/provider'
 import type { AttributeValue } from '@opentelemetry/api'
+import { createSchemaFromObject, isZodSchema } from './utils/schema'
+import type { SchemaObject, SchemaShape } from './utils/schema'
 
 // Default model configuration
 const defaultModel = openai('gpt-4o')
@@ -17,9 +19,9 @@ type TelemetrySettings = {
 }
 
 type AIProps<T> = {
-  children: (props: T) => ReactNode
+  children: (props: T extends SchemaObject ? SchemaShape : T) => ReactNode
   prompt: string
-  schema: z.Schema<T>
+  schema: z.ZodSchema<T> | SchemaObject
   model?: typeof defaultModel
   output?: 'no-schema'
   schemaName?: string
@@ -32,7 +34,7 @@ type AIProps<T> = {
 export function AI<T>({
   children,
   prompt,
-  schema,
+  schema: rawSchema,
   model = defaultModel,
   output = 'no-schema',
   schemaName,
@@ -41,8 +43,13 @@ export function AI<T>({
   experimental_telemetry,
   experimental_providerMetadata,
 }: AIProps<T>) {
-  const [result, setResult] = useState<T | null>(null)
+  type ResultType = T extends SchemaObject ? SchemaShape : T
+  const [result, setResult] = useState<ResultType | null>(null)
   const [error, setError] = useState<Error | null>(null)
+
+  const schema = isZodSchema(rawSchema)
+    ? rawSchema as z.ZodSchema<ResultType>
+    : createSchemaFromObject(rawSchema as SchemaObject) as unknown as z.ZodSchema<ResultType>
 
   useEffect(() => {
     const generateProps = async () => {
@@ -56,9 +63,8 @@ export function AI<T>({
           ...(experimental_providerMetadata && { experimental_providerMetadata }),
         })
 
-        // Parse the response with the provided schema
         const parsed = schema.parse(response.object)
-        setResult(parsed)
+        setResult(parsed as ResultType)
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Unknown error'))
       }
@@ -72,7 +78,7 @@ export function AI<T>({
   }
 
   if (!result) {
-    return null // or loading state
+    return null
   }
 
   return children(result)
