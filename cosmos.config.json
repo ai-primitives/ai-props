@@ -4,5 +4,6 @@
   "watchDirs": ["src"],
   "vite": {
     "configPath": "vite.config.ts"
-  }
+  },
+  "globalImports": ["src/cosmos.decorator.tsx"]
 }

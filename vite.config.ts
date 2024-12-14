@@ -5,6 +5,14 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@ai-sdk/provider': resolve(__dirname, 'node_modules/@ai-sdk/provider')
+    }
+  },
+  optimizeDeps: {
+    include: ['@ai-sdk/provider']
+  },
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
@@ -12,13 +20,14 @@ export default defineConfig({
       fileName: (format) => `ai-props.${format}.js`
     },
     rollupOptions: {
-      external: ['react', 'react-dom', 'ai', '@ai-sdk/openai'],
+      external: ['react', 'react-dom', 'ai', '@ai-sdk/openai', '@ai-sdk/provider'],
       output: {
         globals: {
           react: 'React',
           'react-dom': 'ReactDOM',
           ai: 'ai',
-          '@ai-sdk/openai': 'aiSdkOpenai'
+          '@ai-sdk/openai': 'aiSdkOpenai',
+          '@ai-sdk/provider': 'aiSdkProvider'
         }
       }
     }

@@ -7,7 +7,8 @@
     "skipLibCheck": true,
 
     /* Bundler mode */
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -26,7 +27,20 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "sourceMap": true,
-    "declarationMap": true
+    "declarationMap": true,
+
+    /* Type Resolution for @ai-sdk/provider */
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules/@ai-sdk/provider",
+      "./node_modules/@ai-sdk/openai/node_modules/@ai-sdk/provider"
+    ],
+    "paths": {
+      "@ai-sdk/provider": [
+        "./node_modules/@ai-sdk/provider",
+        "./node_modules/@ai-sdk/openai/node_modules/@ai-sdk/provider"
+      ]
+    }
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
