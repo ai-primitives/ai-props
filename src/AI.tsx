@@ -54,12 +54,15 @@ export function AI<T>({
   experimental_telemetry,
   experimental_providerMetadata,
 }: AIProps<T>) {
+  console.log('AI Component: Initializing with props', { prompt, output, count, cols })
   const [results, setResults] = useState<T[]>([])
   const [error, setError] = useState<Error | null>(null)
 
   const schema = isZodSchema(rawSchema)
     ? rawSchema as z.ZodSchema<T>
     : createSchemaFromObject(rawSchema as SchemaObject) as unknown as z.ZodSchema<T>
+
+  console.log('AI Component: Schema created', { schema })
 
   const gridStyle = output === 'array' ? {
     display: 'grid',
@@ -68,8 +71,10 @@ export function AI<T>({
   } : undefined
 
   useEffect(() => {
+    console.log('AI Component: Starting generateProps effect')
     const generateProps = async () => {
       try {
+        console.log('AI Component: Calling generateObject with', { model, prompt, output })
         const response = await generateObject({
           model,
           prompt: output === 'array'
@@ -81,6 +86,7 @@ export function AI<T>({
           ...(experimental_providerMetadata && { experimental_providerMetadata }),
         })
 
+        console.log('AI Component: Generated response', response)
         const responseObject = response.object as Record<string, unknown>
         const parsed = output === 'array'
           ? (Array.isArray(responseObject)
@@ -88,8 +94,10 @@ export function AI<T>({
               : [])
           : [schema.parse(responseObject)]
 
+        console.log('AI Component: Setting parsed results', parsed)
         setResults(parsed)
       } catch (err) {
+        console.error('AI Component: Error generating props', err)
         setError(err instanceof Error ? err : new Error('Unknown error'))
       }
     }
@@ -98,13 +106,16 @@ export function AI<T>({
   }, [prompt, schema, model, output, count, cols, gap, className, schemaName, schemaDescription, mode, experimental_telemetry, experimental_providerMetadata])
 
   if (error) {
+    console.error('AI Component: Throwing error', error)
     throw error
   }
 
   if (!results.length) {
+    console.log('AI Component: No results yet, returning null')
     return null
   }
 
+  console.log('AI Component: Rendering with results', results)
   return output === 'array' ? (
     <div style={gridStyle} className={cn('ai-grid', className)}>
       {results.map((result, index) => (

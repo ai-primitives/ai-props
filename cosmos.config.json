@@ -3,7 +3,11 @@
   "exportPath": "cosmos-export",
   "watchDirs": ["src"],
   "vite": {
-    "configPath": "vite.config.ts"
+    "configPath": "vite.config.ts",
+    "hot": true
+  },
+  "ui": {
+    "responsivePanels": true
   },
   "globalImports": ["src/cosmos.decorator.tsx"]
 }

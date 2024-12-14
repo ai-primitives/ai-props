@@ -4,14 +4,28 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      jsxRuntime: 'automatic'
+    })
+  ],
   resolve: {
     alias: {
-      '@ai-sdk/provider': resolve(__dirname, 'node_modules/@ai-sdk/provider')
+      '@ai-sdk/provider': resolve(__dirname, 'node_modules/@ai-sdk/provider'),
+      'react': resolve(__dirname, 'node_modules/react'),
+      'react-dom': resolve(__dirname, 'node_modules/react-dom')
     }
   },
   optimizeDeps: {
-    include: ['@ai-sdk/provider']
+    include: ['@ai-sdk/provider', 'react', 'react-dom']
+  },
+  server: {
+    port: 5001,
+    strictPort: true,
+    hmr: {
+      port: 5001,
+      clientPort: 5000
+    }
   },
   build: {
     lib: {

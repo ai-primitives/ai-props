@@ -58,5 +58,8 @@ const HeroFixture = () => {
 }
 
 export default {
-  'Editable Hero': <HeroFixture />
+  'Editable Hero': () => {
+    console.log('Hero Fixture: Rendering')
+    return <HeroFixture />
+  }
 }
