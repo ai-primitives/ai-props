@@ -2,6 +2,7 @@
   "name": "ai-props",
   "version": "0.1.1",
   "description": "Magic AI Prop Generation",
+  "repository": "https://github.com/ai-primitives/ai-props",
   "type": "module",
   "main": "./dist/ai-props.umd.js",
   "module": "./dist/ai-props.es.js",
