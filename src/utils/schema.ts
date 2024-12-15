@@ -35,14 +35,12 @@ function convertToZodSchema(schema: SchemaObject): z.ZodObject<SchemaZodShape> {
     if (key === 'profile' && typeof value === 'object' && value !== null && 'customer' in value && 'solution' in value) {
       zodSchema[key] = z.object({
         customer: z.string().describe((value as ProfileObject).customer),
-        solution: z.string().describe((value as ProfileObject).solution)
+        solution: z.string().describe((value as ProfileObject).solution),
       })
     } else if (Array.isArray(value)) {
       zodSchema[key] = z.array(z.string()).describe(value.join(', '))
     } else if (typeof value === 'string') {
-      zodSchema[key] = value.includes('|')
-        ? z.enum(value.split('|').map(v => v.trim()) as [string, ...string[]]).describe(value)
-        : z.string().describe(value)
+      zodSchema[key] = value.includes('|') ? z.enum(value.split('|').map((v) => v.trim()) as [string, ...string[]]).describe(value) : z.string().describe(value)
     }
   }
 
