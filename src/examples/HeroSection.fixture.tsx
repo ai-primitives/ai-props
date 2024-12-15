@@ -19,7 +19,7 @@ const heroSchema = z.object({
   subheadline: z.string().describe('engaging subheadline explaining value proposition'),
   ctaText: z.string().describe('action-oriented button text'),
   benefits: z.array(z.string()).describe('3-5 key benefits'),
-  targetAudience: z.string().describe('specific target audience description')
+  targetAudience: z.string().describe('specific target audience description'),
 })
 
 type HeroProps = z.infer<typeof heroSchema>
@@ -27,19 +27,15 @@ type HeroProps = z.infer<typeof heroSchema>
 const HeroFixture = () => {
   const [model] = useValue('model', { defaultValue: 'gpt-4o' })
   const [prompt] = useValue('prompt', {
-    defaultValue: 'Create a compelling hero section for an AI SaaS product that highlights its key benefits and target audience.'
+    defaultValue: 'Create a compelling hero section for an AI SaaS product that highlights its key benefits and target audience.',
   })
 
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       <Suspense fallback={<LoadingFallback />}>
-        <AI
-          model={openai(model)}
-          schema={heroSchema}
-          prompt={prompt}
-        >
+        <AI model={openai(model)} schema={heroSchema} prompt={prompt}>
           {(props: HeroProps) => (
-            <div className="hero-section">
+            <div className='hero-section'>
               <h1>{props.headline}</h1>
               <p>{props.subheadline}</p>
               <button>{props.ctaText}</button>
@@ -58,5 +54,5 @@ const HeroFixture = () => {
 }
 
 export default {
-  'Editable Hero': <HeroFixture />
+  'Editable Hero': <HeroFixture />,
 }

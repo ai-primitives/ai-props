@@ -6,11 +6,12 @@ import { z } from 'zod'
 import { createSchemaFromObject } from './utils/schema'
 import type { SchemaObject, SchemaShape } from './utils/schema'
 import { cn } from './utils/styles'
+import type { StreamObjectResult } from './types/ai'
 
 vi.mock('ai', () => {
   return {
     streamObject: vi.fn(),
-    generateObject: vi.fn()
+    generateObject: vi.fn(),
   }
 })
 
@@ -22,10 +23,10 @@ describe('AI', () => {
       productType: 'App | API | Marketplace | Platform | Packaged Service | Professional Service | Website',
       profile: {
         customer: 'ideal customer profile in 3-5 words',
-        solution: 'describe the offer in 4-10 words'
+        solution: 'describe the offer in 4-10 words',
       },
       description: 'website meta description',
-      tags: ['SEO-optimized meta tags']
+      tags: ['SEO-optimized meta tags'],
     }
 
     const zodSchema = createSchemaFromObject(schema)
@@ -33,10 +34,10 @@ describe('AI', () => {
       productType: 'App',
       profile: {
         customer: 'Small Business Owners',
-        solution: 'Automated Accounting Software'
+        solution: 'Automated Accounting Software',
       },
       description: 'Effortless accounting for small businesses',
-      tags: ['accounting', 'small business', 'automation']
+      tags: ['accounting', 'small business', 'automation'],
     }
 
     // Verify schema conversion
@@ -65,13 +66,9 @@ describe('AI', () => {
     expect(Array.isArray(testData.tags)).toBe(true)
 
     const { container } = render(
-      <AI<SchemaObject, 'object'>
-        schema={schema}
-        prompt="Generate product details"
-        output="object"
-      >
-        {(props: SchemaObject) => <div data-testid="content">{props.description}</div>}
-      </AI>
+      <AI<SchemaObject, 'object'> schema={schema} prompt='Generate product details' output='object'>
+        {(props: SchemaObject) => <div data-testid='content'>{props.description}</div>}
+      </AI>,
     )
 
     // Initial render should be empty (loading state)
@@ -81,19 +78,15 @@ describe('AI', () => {
   it('supports direct Zod schema usage', () => {
     const directSchema = z.object({
       title: z.string(),
-      description: z.string()
+      description: z.string(),
     })
 
     type DirectSchema = z.infer<typeof directSchema>
 
     const { container } = render(
-      <AI<DirectSchema, 'object'>
-        schema={directSchema}
-        prompt="Generate content"
-        output="object"
-      >
+      <AI<DirectSchema, 'object'> schema={directSchema} prompt='Generate content' output='object'>
         {(props: DirectSchema) => <div>{props.title}</div>}
-      </AI>
+      </AI>,
     )
 
     expect(container.innerHTML).toBe('')
@@ -104,10 +97,10 @@ describe('AI', () => {
       productType: 'App | API | Marketplace | Platform | Packaged Service | Professional Service | Website',
       profile: {
         customer: 'ideal customer profile in 3-5 words',
-        solution: 'describe the offer in 4-10 words'
+        solution: 'describe the offer in 4-10 words',
       },
       description: 'website meta description',
-      tags: ['SEO-optimized meta tags']
+      tags: ['SEO-optimized meta tags'],
     }
 
     const zodSchema = createSchemaFromObject(schema)
@@ -142,48 +135,69 @@ describe('Streaming and API Proxy', () => {
   })
 
   it('uses streamObject when stream prop is true', async () => {
-    const mockResponse = { object: { title: 'Test', content: 'Content' } }
-    ;(streamObject as any).mockResolvedValue(mockResponse)
+    const mockResponse = { title: 'Test', content: 'Content' }
+    const mockStreamObject = vi.mocked(streamObject)
+    const mockStreamResult: StreamObjectResult<typeof testSchema, typeof mockResponse> = {
+      [Symbol.asyncIterator]: async function* () {
+        yield {
+          object: mockResponse,
+          usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+          warnings: [],
+        }
+      },
+      warnings: [],
+      usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+      experimental_providerMetadata: {},
+      request: {
+        prompt: 'Generate content',
+        model: 'gpt-4',
+        schema: testSchema,
+        mode: 'json',
+      },
+    }
+    mockStreamObject.mockImplementation(() => mockStreamResult)
 
     render(
-      <AI<TestSchema, 'object'>
-        prompt='Generate content'
-        schema={testSchema}
-        stream={true}
-        output="object"
-      >
+      <AI<TestSchema, 'object'> prompt='Generate content' schema={testSchema} stream={true} output='object'>
         {(props: TestSchema) => (
           <div>
             <h1>{props.title}</h1>
             <p>{props.content}</p>
           </div>
         )}
-      </AI>
+      </AI>,
     )
 
-    await waitFor(() => {
-      expect(screen.getByText('Test')).toBeInTheDocument()
-    })
-    expect(streamObject).toHaveBeenCalledWith(expect.objectContaining({
-      prompt: 'Generate content',
-      schema: expect.any(Object),
-    }))
+    await waitFor(
+      () => {
+        expect(screen.getByText('Test')).toBeInTheDocument()
+      },
+      { timeout: 2000 },
+    )
+
+    expect(streamObject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'Generate content',
+        schema: expect.any(Object),
+      }),
+    )
   })
 
   it('uses API proxy when apiEndpoint is provided', async () => {
-    const mockResponse = { object: { title: 'API Test', content: 'API Content' } }
+    const mockResponse = { title: 'API Test', content: 'API Content' }
     ;(global.fetch as MockFetch).mockResolvedValueOnce({
       ok: true,
-      json: async () => mockResponse,
-    })
+      json: async () => ({ object: mockResponse }),
+      status: 200,
+    } as Response)
 
     render(
       <AI<TestSchema, 'object'>
         prompt='Generate content'
         schema={testSchema}
         apiEndpoint='/api/generate'
-        headers={{ 'Authorization': 'Bearer test' }}
-        output="object"
+        headers={{ Authorization: 'Bearer test' }}
+        output='object'
       >
         {(props: TestSchema) => (
           <div>
@@ -191,46 +205,65 @@ describe('Streaming and API Proxy', () => {
             <p>{props.content}</p>
           </div>
         )}
-      </AI>
+      </AI>,
     )
 
-    await waitFor(() => {
-      expect(screen.getByText('API Test')).toBeInTheDocument()
-    })
+    await waitFor(
+      () => {
+        expect(screen.getByText('API Test')).toBeInTheDocument()
+      },
+      { timeout: 2000 },
+    )
+
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/generate',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer test',
+          Authorization: 'Bearer test',
         }),
-      })
+      }),
     )
   })
 
   it('supports array output with streaming', async () => {
     const mockStreamObject = vi.mocked(streamObject)
-    mockStreamObject.mockImplementation(async function* () {
-      const chunks = [
-        { object: [{ title: 'Stream 1', description: 'Description 1' }] },
-        { object: [
-          { title: 'Stream 1', description: 'Description 1' },
-          { title: 'Stream 2', description: 'Description 2' }
-        ] }
-      ]
-      for (const chunk of chunks) {
-        yield chunk
-      }
-    } as unknown as typeof streamObject)
+    const mockStreamResult: StreamObjectResult<typeof testSchema, TestSchema[]> = {
+      [Symbol.asyncIterator]: async function* () {
+        const chunks = [
+          {
+            object: [{ title: 'Stream 1', content: 'Content 1' }],
+            usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+            warnings: [],
+          },
+          {
+            object: [
+              { title: 'Stream 1', content: 'Content 1' },
+              { title: 'Stream 2', content: 'Content 2' },
+            ],
+            usage: { prompt_tokens: 15, completion_tokens: 25, total_tokens: 40 },
+            warnings: [],
+          },
+        ]
+        for (const chunk of chunks) {
+          yield chunk
+        }
+      },
+      warnings: [],
+      usage: { prompt_tokens: 15, completion_tokens: 25, total_tokens: 40 },
+      experimental_providerMetadata: {},
+      request: {
+        prompt: 'Generate blog posts',
+        model: 'gpt-4',
+        schema: testSchema,
+        mode: 'json',
+      },
+    }
+    mockStreamObject.mockImplementation(() => mockStreamResult)
 
     render(
-      <AI<TestSchema, 'array'>
-        schema={testSchema}
-        prompt="Generate test items"
-        stream
-        output="array"
-      >
+      <AI<TestSchema, 'array'> schema={testSchema} prompt='Generate test items' stream output='array'>
         {(props: TestSchema[]) => (
           <div>
             {props.map((item, index) => (
@@ -241,16 +274,22 @@ describe('Streaming and API Proxy', () => {
             ))}
           </div>
         )}
-      </AI>
+      </AI>,
     )
 
-    await waitFor(() => {
-      expect(screen.getByTestId('stream-item-0')).toHaveTextContent('Stream 1')
-    }, { timeout: 2000 })
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('stream-item-0')).toHaveTextContent('Stream 1')
+      },
+      { timeout: 2000 },
+    )
 
-    await waitFor(() => {
-      expect(screen.getByTestId('stream-item-1')).toHaveTextContent('Stream 2')
-    }, { timeout: 2000 })
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('stream-item-1')).toHaveTextContent('Stream 2')
+      },
+      { timeout: 2000 },
+    )
   })
 })
 
@@ -260,33 +299,33 @@ describe('Array Output and Grid Support', () => {
       productType: 'Blog',
       profile: {
         customer: 'blog readers',
-        solution: 'informative content'
+        solution: 'informative content',
       },
       title: 'engaging blog post title',
       excerpt: 'compelling 2-3 sentence excerpt',
       readTime: 'estimated read time',
       category: 'Blog | Tutorial | Case Study | News',
       description: 'blog post meta description',
-      tags: ['relevant topic tags']
+      tags: ['relevant topic tags'],
     }
 
     const { container } = render(
       <AI<typeof blogSchema, 'array'>
         schema={blogSchema}
-        prompt="Generate blog posts"
-        output="array"
+        prompt='Generate blog posts'
+        output='array'
         cols={3}
-        gap="2rem"
+        gap='2rem'
         className={cn('test-grid', 'custom-grid')}
         itemClassName={cn('test-item', 'custom-item')}
       >
         {(props: z.infer<ReturnType<typeof createSchemaFromObject>>[]) => (
-          <article data-testid="blog-item">
+          <article data-testid='blog-item'>
             <h2>{props[0].title as string}</h2>
             <p>{props[0].excerpt as string}</p>
           </article>
         )}
-      </AI>
+      </AI>,
     )
 
     // Initial render should be empty
@@ -298,29 +337,25 @@ describe('Array Output and Grid Support', () => {
       productType: 'App | API | Marketplace | Platform',
       profile: {
         customer: 'ideal customer profile',
-        solution: 'product solution'
+        solution: 'product solution',
       },
       headline: 'compelling headline for AI SaaS product',
       subheadline: 'engaging subheadline explaining value proposition',
       ctaText: 'action-oriented button text',
       benefits: ['3-5 key benefits'],
       description: 'product description',
-      tags: ['relevant tags']
+      tags: ['relevant tags'],
     }
 
     const { container } = render(
-      <AI<typeof heroSchema>
-        schema={heroSchema}
-        prompt="Generate hero section"
-        className={cn('base-class', 'custom-class')}
-      >
+      <AI<typeof heroSchema> schema={heroSchema} prompt='Generate hero section' className={cn('base-class', 'custom-class')}>
         {(props: z.infer<ReturnType<typeof createSchemaFromObject>>) => (
-          <div data-testid="hero-section">
+          <div data-testid='hero-section'>
             <h1>{props.headline as string}</h1>
             <p>{props.subheadline as string}</p>
           </div>
         )}
-      </AI>
+      </AI>,
     )
 
     // Initial render should be empty
@@ -332,26 +367,24 @@ describe('Array Output and Grid Support', () => {
       productType: 'App',
       profile: {
         customer: 'test customer',
-        solution: 'test solution'
+        solution: 'test solution',
       },
       description: 'test description',
-      tags: ['test']
+      tags: ['test'],
     }
 
     const { container } = render(
       <AI<typeof schema, 'array'>
         schema={schema}
-        prompt="Generate items"
-        output="array"
+        prompt='Generate items'
+        output='array'
         cols={2}
-        gap="1rem"
+        gap='1rem'
         className={cn('grid-container', 'custom-container')}
         itemClassName={cn('grid-item', 'custom-item')}
       >
-        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>[]) => (
-          <div>{props[0].description as string}</div>
-        )}
-      </AI>
+        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>[]) => <div>{props[0].description as string}</div>}
+      </AI>,
     )
 
     // Initial render should be empty
@@ -365,25 +398,20 @@ describe('Example Components', () => {
       productType: 'App',
       profile: {
         customer: 'ideal customer profile',
-        solution: 'product solution'
+        solution: 'product solution',
       },
       headline: 'compelling headline for AI SaaS product',
       subheadline: 'engaging subheadline explaining value proposition',
       ctaText: 'action-oriented button text',
       benefits: ['3-5 key benefits'],
       description: 'product description',
-      tags: ['relevant tags']
+      tags: ['relevant tags'],
     }
 
     const { container } = render(
-      <AI<typeof heroSchema, 'object'>
-        schema={heroSchema}
-        prompt="Generate hero section"
-        output="object"
-        className={cn('hero-section', 'custom-hero')}
-      >
+      <AI<typeof heroSchema, 'object'> schema={heroSchema} prompt='Generate hero section' output='object' className={cn('hero-section', 'custom-hero')}>
         {(props: z.infer<ReturnType<typeof createSchemaFromObject>>) => (
-          <div data-testid="hero-content">
+          <div data-testid='hero-content'>
             <h1>{props.headline as string}</h1>
             <p>{props.subheadline as string}</p>
             <button>{props.ctaText as string}</button>
@@ -394,7 +422,7 @@ describe('Example Components', () => {
             </ul>
           </div>
         )}
-      </AI>
+      </AI>,
     )
 
     // Initial render should be empty
@@ -406,21 +434,21 @@ describe('Example Components', () => {
       productType: 'Blog',
       profile: {
         customer: 'blog readers',
-        solution: 'informative content'
+        solution: 'informative content',
       },
       title: 'engaging blog post title',
       excerpt: 'compelling 2-3 sentence excerpt',
       readTime: 'estimated read time',
       category: 'Blog | Tutorial | Case Study | News',
       description: 'blog post description',
-      tags: ['relevant topic tags']
+      tags: ['relevant topic tags'],
     }
 
     const { container } = render(
       <AI<typeof blogSchema, 'array'>
         schema={blogSchema}
-        prompt="Generate blog posts"
-        output="array"
+        prompt='Generate blog posts'
+        output='array'
         cols={3}
         className={cn('blog-grid', 'custom-blog-grid')}
         itemClassName={cn('blog-item', 'custom-blog-item')}
@@ -428,7 +456,7 @@ describe('Example Components', () => {
         {(props: z.infer<ReturnType<typeof createSchemaFromObject>>[]) => (
           <>
             {props.map((post, index) => (
-              <article key={index} data-testid="blog-post">
+              <article key={index} data-testid='blog-post'>
                 <h2>{post.title as string}</h2>
                 <p>{post.excerpt as string}</p>
                 <div>{post.readTime as string}</div>
@@ -438,7 +466,7 @@ describe('Example Components', () => {
             ))}
           </>
         )}
-      </AI>
+      </AI>,
     )
 
     // Initial render should be empty

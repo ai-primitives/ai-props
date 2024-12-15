@@ -45,73 +45,56 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
   experimental_providerMetadata,
   className,
   itemClassName,
-  gap = '1rem'
+  gap = '1rem',
 }: AIProps<T, O>) {
   const [results, setResults] = useState<T[]>([])
   const [error, setError] = useState<Error | null>(null)
 
-  const schema = isZodSchema(rawSchema)
-    ? rawSchema as z.ZodSchema<T>
-    : createSchemaFromObject(rawSchema as SchemaObject) as unknown as z.ZodSchema<T>
+  const schema = isZodSchema(rawSchema) ? (rawSchema as z.ZodSchema<T>) : (createSchemaFromObject(rawSchema as SchemaObject) as unknown as z.ZodSchema<T>)
 
-  const gridStyle = output === 'array' ? {
-    display: 'grid',
-    gridTemplateColumns: `repeat(${cols || 1}, minmax(0, 1fr))`,
-    gap,
-  } : undefined
+  const gridStyle =
+    output === 'array'
+      ? {
+          display: 'grid',
+          gridTemplateColumns: `repeat(${cols || 1}, minmax(0, 1fr))`,
+          gap,
+        }
+      : undefined
 
   useEffect(() => {
     const generateProps = async () => {
       try {
-        const schemaObject = isZodSchema(schema)
-          ? (schema.describe('') as unknown as SchemaObject)
-          : (schema as SchemaObject)
+        const schemaObject = isZodSchema(schema) ? (schema.describe('') as unknown as SchemaObject) : (schema as SchemaObject)
 
         const validationSchema = isZodSchema(schema)
           ? (schema as unknown as z.ZodSchema<T>)
           : (createSchemaFromObject(schema as SchemaObject) as unknown as z.ZodSchema<T>)
 
         if (stream) {
-          const response = await fetch(apiEndpoint || '/api/generate', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(headers || {})
-            },
-            body: JSON.stringify({
-              prompt,
-              model: resolveModel(model),
-              schema: output === 'array' ? { type: 'array', items: schemaObject } : schemaObject,
-              mode: mode || 'json',
-              ...(experimental_telemetry && { experimental_telemetry }),
-              ...(experimental_providerMetadata && { experimental_providerMetadata })
-            })
+          const { streamObject } = await import('ai')
+          const streamResponse = streamObject({
+            prompt,
+            model: resolveModel(model),
+            schema: output === 'array' ? { type: 'array', items: schemaObject } : schemaObject,
+            mode: mode || 'json',
+            ...(experimental_telemetry && { experimental_telemetry }),
+            ...(experimental_providerMetadata && { experimental_providerMetadata }),
+            ...(apiEndpoint && { apiEndpoint }),
+            ...(headers && { headers }),
           })
 
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`)
-          }
-
-          const reader = response.body?.getReader()
-          const decoder = new TextDecoder()
-
-          if (!reader) throw new Error('No reader available')
-
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-
-            const chunk = decoder.decode(value)
-            try {
-              const parsed = JSON.parse(chunk)
-              if (output === 'array') {
-                const arrayData = Array.isArray(parsed) ? parsed : [parsed]
-                setResults(arrayData.map(item => validationSchema.parse(item) as T))
-              } else {
-                setResults([validationSchema.parse(parsed) as T])
+          for await (const chunk of streamResponse) {
+            if (chunk.object) {
+              try {
+                if (output === 'array') {
+                  const arrayData = Array.isArray(chunk.object) ? chunk.object : [chunk.object]
+                  setResults(arrayData.map((item: unknown) => validationSchema.parse(item)))
+                } else {
+                  setResults([validationSchema.parse(chunk.object)])
+                }
+              } catch (e) {
+                console.error('Error parsing chunk:', e)
               }
-            } catch (e) {
-              console.error('Error parsing chunk:', e)
             }
           }
         } else {
@@ -119,7 +102,7 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              ...(headers || {})
+              ...(headers || {}),
             },
             body: JSON.stringify({
               prompt,
@@ -127,20 +110,18 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
               schema: output === 'array' ? { type: 'array', items: schemaObject } : schemaObject,
               mode: mode || 'json',
               ...(experimental_telemetry && { experimental_telemetry }),
-              ...(experimental_providerMetadata && { experimental_providerMetadata })
-            })
+              ...(experimental_providerMetadata && { experimental_providerMetadata }),
+            }),
           })
 
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`)
+          if (!response?.ok) {
+            throw new Error(`HTTP error! status: ${response?.status}`)
           }
 
           const responseData = await response.json()
-          const parsed = output === 'array'
-            ? (Array.isArray(responseData) ? responseData : [responseData])
-            : [responseData]
+          const parsed = output === 'array' ? (Array.isArray(responseData.object) ? responseData.object : [responseData.object]) : [responseData.object]
 
-          setResults(parsed.map(item => validationSchema.parse(item) as T))
+          setResults(parsed.map((item: unknown) => validationSchema.parse(item)))
         }
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Unknown error'))
@@ -160,9 +141,9 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
 
   return output === 'array' ? (
     <div style={gridStyle} className={clsx('ai-grid', className)}>
-      <div className={clsx('ai-grid-items', itemClassName)}>
-        {children(results as O extends 'array' ? T[] : T)}
-      </div>
+      <div className={clsx('ai-grid-items', itemClassName)}>{children(results as O extends 'array' ? T[] : T)}</div>
     </div>
-  ) : children(results[0] as O extends 'array' ? T[] : T)
+  ) : (
+    children(results[0] as O extends 'array' ? T[] : T)
+  )
 }
