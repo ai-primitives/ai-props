@@ -1,5 +1,5 @@
 {
-  "name": "ai-props",
+  "name": "@ai-primitives/ai-props",
   "version": "0.1.0",
   "description": "Magic AI Prop Generation",
   "type": "module",
