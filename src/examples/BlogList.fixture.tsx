@@ -45,22 +45,26 @@ const BlogFixture = () => {
           className="gap-6"
           prompt={prompt}
         >
-          {(props: BlogProps) => (
-            <div className={cn('blog-card', 'p-4 border rounded-lg')}>
-              <h2>{props.title}</h2>
-              <p>{props.excerpt}</p>
-              <div className="meta">
-                <span>{props.readTime}</span>
-                <span>{props.category}</span>
-              </div>
-              <div className="tags">
-                {props.tags.map((tag, i) => (
-                  <span key={i} className="tag">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
+          {(props: BlogProps[]) => (
+            <>
+              {props.map((post, index) => (
+                <div key={index} className={cn('blog-card', 'p-4 border rounded-lg')}>
+                  <h2>{post.title}</h2>
+                  <p>{post.excerpt}</p>
+                  <div className="meta">
+                    <span>{post.readTime}</span>
+                    <span>{post.category}</span>
+                  </div>
+                  <div className="tags">
+                    {post.tags.map((tag, i) => (
+                      <span key={i} className="tag">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
           )}
         </AI>
       </Suspense>

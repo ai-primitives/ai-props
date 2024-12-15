@@ -1,59 +1,52 @@
-import { ReactNode, useState, useEffect } from 'react'
-import { generateObject } from 'ai'
-import { openai } from '@ai-sdk/openai'
+import { useEffect, useState } from 'react'
 import { z } from 'zod'
-import type { LanguageModelV1ProviderMetadata } from '@ai-sdk/provider'
-import type { AttributeValue } from '@opentelemetry/api'
-import { createSchemaFromObject, isZodSchema } from './utils/schema'
-import type { SchemaObject } from './utils/schema'
-import { cn } from './utils/styles'
+import clsx from 'clsx'
 
-// Default model configuration
-const defaultModel = openai('gpt-4o')
+import { createSchemaFromObject, isZodSchema, type SchemaObject } from './utils/schema'
 
-type TelemetrySettings = {
-  isEnabled?: boolean
-  recordInputs?: boolean
-  recordOutputs?: boolean
-  functionId?: string
-  metadata?: Record<string, AttributeValue>
-}
+type ModelType = string | { provider: string; model: string }
 
-type AIProps<T> = {
-  children: (props: T) => ReactNode
-  prompt: string
+interface AIProps<T extends Record<string, unknown>, O extends 'object' | 'array' = 'object'> {
   schema: z.ZodSchema<T> | SchemaObject
-  model?: typeof defaultModel
-  output?: 'object' | 'array'
-  count?: number // Number of items to generate in array mode
+  prompt: string
+  model?: ModelType
+  output?: O
+  count?: number
   cols?: number
-  gap?: string
+  mode?: 'json'
+  stream?: boolean
+  apiEndpoint?: string
+  headers?: Record<string, string>
+  experimental_telemetry?: boolean
+  experimental_providerMetadata?: boolean
   className?: string
   itemClassName?: string
-  schemaName?: string
-  schemaDescription?: string
-  mode?: 'json'
-  experimental_telemetry?: TelemetrySettings
-  experimental_providerMetadata?: LanguageModelV1ProviderMetadata
+  gap?: string
+  children: (props: O extends 'array' ? T[] : T) => React.ReactNode
 }
 
-export function AI<T>({
+const resolveModel = (modelInput: ModelType = 'gpt-4') => {
+  return typeof modelInput === 'string' ? { provider: 'openai', model: modelInput } : modelInput
+}
+
+export function AI<T extends Record<string, unknown>, O extends 'object' | 'array' = 'object'>({
   children,
   prompt,
   schema: rawSchema,
-  model = defaultModel,
-  output = 'object',
+  model = 'gpt-4',
+  output = 'object' as O,
   count,
   cols,
-  gap = '1rem',
-  className,
-  itemClassName,
-  schemaName,
-  schemaDescription,
   mode = 'json',
+  stream = false,
+  apiEndpoint,
+  headers,
   experimental_telemetry,
   experimental_providerMetadata,
-}: AIProps<T>) {
+  className,
+  itemClassName,
+  gap = '1rem'
+}: AIProps<T, O>) {
   const [results, setResults] = useState<T[]>([])
   const [error, setError] = useState<Error | null>(null)
 
@@ -70,32 +63,92 @@ export function AI<T>({
   useEffect(() => {
     const generateProps = async () => {
       try {
-        const response = await generateObject({
-          model,
-          prompt: output === 'array'
-            ? `Generate an array of ${count || cols || 3} items. ${prompt}`
-            : prompt,
-          output: 'no-schema',
-          mode,
-          ...(experimental_telemetry && { experimental_telemetry }),
-          ...(experimental_providerMetadata && { experimental_providerMetadata }),
-        })
+        const schemaObject = isZodSchema(schema)
+          ? (schema.describe('') as unknown as SchemaObject)
+          : (schema as SchemaObject)
 
-        const responseObject = response.object as Record<string, unknown>
-        const parsed = output === 'array'
-          ? (Array.isArray(responseObject)
-              ? responseObject.map(item => schema.parse(item))
-              : [])
-          : [schema.parse(responseObject)]
+        const validationSchema = isZodSchema(schema)
+          ? (schema as unknown as z.ZodSchema<T>)
+          : (createSchemaFromObject(schema as SchemaObject) as unknown as z.ZodSchema<T>)
 
-        setResults(parsed)
+        if (stream) {
+          const response = await fetch(apiEndpoint || '/api/generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(headers || {})
+            },
+            body: JSON.stringify({
+              prompt,
+              model: resolveModel(model),
+              schema: output === 'array' ? { type: 'array', items: schemaObject } : schemaObject,
+              mode: mode || 'json',
+              ...(experimental_telemetry && { experimental_telemetry }),
+              ...(experimental_providerMetadata && { experimental_providerMetadata })
+            })
+          })
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`)
+          }
+
+          const reader = response.body?.getReader()
+          const decoder = new TextDecoder()
+
+          if (!reader) throw new Error('No reader available')
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = decoder.decode(value)
+            try {
+              const parsed = JSON.parse(chunk)
+              if (output === 'array') {
+                const arrayData = Array.isArray(parsed) ? parsed : [parsed]
+                setResults(arrayData.map(item => validationSchema.parse(item) as T))
+              } else {
+                setResults([validationSchema.parse(parsed) as T])
+              }
+            } catch (e) {
+              console.error('Error parsing chunk:', e)
+            }
+          }
+        } else {
+          const response = await fetch(apiEndpoint || '/api/generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(headers || {})
+            },
+            body: JSON.stringify({
+              prompt,
+              model: resolveModel(model),
+              schema: output === 'array' ? { type: 'array', items: schemaObject } : schemaObject,
+              mode: mode || 'json',
+              ...(experimental_telemetry && { experimental_telemetry }),
+              ...(experimental_providerMetadata && { experimental_providerMetadata })
+            })
+          })
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`)
+          }
+
+          const responseData = await response.json()
+          const parsed = output === 'array'
+            ? (Array.isArray(responseData) ? responseData : [responseData])
+            : [responseData]
+
+          setResults(parsed.map(item => validationSchema.parse(item) as T))
+        }
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Unknown error'))
       }
     }
 
     generateProps()
-  }, [prompt, schema, model, output, count, cols, gap, className, schemaName, schemaDescription, mode, experimental_telemetry, experimental_providerMetadata])
+  }, [prompt, schema, model, output, count, cols, mode, experimental_telemetry, experimental_providerMetadata, stream, apiEndpoint, headers])
 
   if (error) {
     throw error
@@ -106,12 +159,10 @@ export function AI<T>({
   }
 
   return output === 'array' ? (
-    <div style={gridStyle} className={cn('ai-grid', className)}>
-      {results.map((result, index) => (
-        <div key={index} className={cn('ai-grid-item', itemClassName)}>
-          {children(result)}
-        </div>
-      ))}
+    <div style={gridStyle} className={clsx('ai-grid', className)}>
+      <div className={clsx('ai-grid-items', itemClassName)}>
+        {children(results as O extends 'array' ? T[] : T)}
+      </div>
     </div>
-  ) : children(results[0])
+  ) : children(results[0] as O extends 'array' ? T[] : T)
 }

@@ -1,10 +1,20 @@
-import { describe, it, expect } from 'vitest'
-import { render } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 import { AI } from './AI'
+import { streamObject } from 'ai'
 import { z } from 'zod'
 import { createSchemaFromObject } from './utils/schema'
 import type { SchemaObject, SchemaShape } from './utils/schema'
 import { cn } from './utils/styles'
+
+vi.mock('ai', () => {
+  return {
+    streamObject: vi.fn(),
+    generateObject: vi.fn()
+  }
+})
+
+type MockFetch = ReturnType<typeof vi.fn>
 
 describe('AI', () => {
   it('renders with simplified schema interface', async () => {
@@ -55,11 +65,13 @@ describe('AI', () => {
     expect(Array.isArray(testData.tags)).toBe(true)
 
     const { container } = render(
-      <AI<SchemaObject>
+      <AI<SchemaObject, 'object'>
         schema={schema}
         prompt="Generate product details"
-        children={(props: SchemaShape) => <div data-testid="content">{props.description}</div>}
-      />
+        output="object"
+      >
+        {(props: SchemaObject) => <div data-testid="content">{props.description}</div>}
+      </AI>
     )
 
     // Initial render should be empty (loading state)
@@ -75,11 +87,13 @@ describe('AI', () => {
     type DirectSchema = z.infer<typeof directSchema>
 
     const { container } = render(
-      <AI<DirectSchema>
+      <AI<DirectSchema, 'object'>
         schema={directSchema}
         prompt="Generate content"
-        children={(props) => <div>{props.title}</div>}
-      />
+        output="object"
+      >
+        {(props: DirectSchema) => <div>{props.title}</div>}
+      </AI>
     )
 
     expect(container.innerHTML).toBe('')
@@ -110,6 +124,136 @@ describe('AI', () => {
   })
 })
 
+describe('Streaming and API Proxy', () => {
+  const testSchema = z.object({
+    title: z.string(),
+    content: z.string(),
+  })
+
+  type TestSchema = z.infer<typeof testSchema>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    global.fetch = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('uses streamObject when stream prop is true', async () => {
+    const mockResponse = { object: { title: 'Test', content: 'Content' } }
+    ;(streamObject as any).mockResolvedValue(mockResponse)
+
+    render(
+      <AI<TestSchema, 'object'>
+        prompt='Generate content'
+        schema={testSchema}
+        stream={true}
+        output="object"
+      >
+        {(props: TestSchema) => (
+          <div>
+            <h1>{props.title}</h1>
+            <p>{props.content}</p>
+          </div>
+        )}
+      </AI>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Test')).toBeInTheDocument()
+    })
+    expect(streamObject).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'Generate content',
+      schema: expect.any(Object),
+    }))
+  })
+
+  it('uses API proxy when apiEndpoint is provided', async () => {
+    const mockResponse = { object: { title: 'API Test', content: 'API Content' } }
+    ;(global.fetch as MockFetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    })
+
+    render(
+      <AI<TestSchema, 'object'>
+        prompt='Generate content'
+        schema={testSchema}
+        apiEndpoint='/api/generate'
+        headers={{ 'Authorization': 'Bearer test' }}
+        output="object"
+      >
+        {(props: TestSchema) => (
+          <div>
+            <h1>{props.title}</h1>
+            <p>{props.content}</p>
+          </div>
+        )}
+      </AI>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('API Test')).toBeInTheDocument()
+    })
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/generate',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer test',
+        }),
+      })
+    )
+  })
+
+  it('supports array output with streaming', async () => {
+    const mockStreamObject = vi.mocked(streamObject)
+    mockStreamObject.mockImplementation(async function* () {
+      const chunks = [
+        { object: [{ title: 'Stream 1', description: 'Description 1' }] },
+        { object: [
+          { title: 'Stream 1', description: 'Description 1' },
+          { title: 'Stream 2', description: 'Description 2' }
+        ] }
+      ]
+      for (const chunk of chunks) {
+        yield chunk
+      }
+    } as unknown as typeof streamObject)
+
+    render(
+      <AI<TestSchema, 'array'>
+        schema={testSchema}
+        prompt="Generate test items"
+        stream
+        output="array"
+      >
+        {(props: TestSchema[]) => (
+          <div>
+            {props.map((item, index) => (
+              <div key={index} data-testid={`stream-item-${index}`}>
+                <h1>{item.title}</h1>
+                <p>{item.content}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </AI>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('stream-item-0')).toHaveTextContent('Stream 1')
+    }, { timeout: 2000 })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('stream-item-1')).toHaveTextContent('Stream 2')
+    }, { timeout: 2000 })
+  })
+})
+
 describe('Array Output and Grid Support', () => {
   it('renders array output with grid layout', () => {
     const blogSchema: SchemaObject = {
@@ -127,7 +271,7 @@ describe('Array Output and Grid Support', () => {
     }
 
     const { container } = render(
-      <AI<typeof blogSchema>
+      <AI<typeof blogSchema, 'array'>
         schema={blogSchema}
         prompt="Generate blog posts"
         output="array"
@@ -136,10 +280,10 @@ describe('Array Output and Grid Support', () => {
         className={cn('test-grid', 'custom-grid')}
         itemClassName={cn('test-item', 'custom-item')}
       >
-        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>) => (
+        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>[]) => (
           <article data-testid="blog-item">
-            <h2>{props.title as string}</h2>
-            <p>{props.excerpt as string}</p>
+            <h2>{props[0].title as string}</h2>
+            <p>{props[0].excerpt as string}</p>
           </article>
         )}
       </AI>
@@ -195,7 +339,7 @@ describe('Array Output and Grid Support', () => {
     }
 
     const { container } = render(
-      <AI<typeof schema>
+      <AI<typeof schema, 'array'>
         schema={schema}
         prompt="Generate items"
         output="array"
@@ -204,8 +348,8 @@ describe('Array Output and Grid Support', () => {
         className={cn('grid-container', 'custom-container')}
         itemClassName={cn('grid-item', 'custom-item')}
       >
-        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>) => (
-          <div>{props.description as string}</div>
+        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>[]) => (
+          <div>{props[0].description as string}</div>
         )}
       </AI>
     )
@@ -232,9 +376,10 @@ describe('Example Components', () => {
     }
 
     const { container } = render(
-      <AI<typeof heroSchema>
+      <AI<typeof heroSchema, 'object'>
         schema={heroSchema}
         prompt="Generate hero section"
+        output="object"
         className={cn('hero-section', 'custom-hero')}
       >
         {(props: z.infer<ReturnType<typeof createSchemaFromObject>>) => (
@@ -272,7 +417,7 @@ describe('Example Components', () => {
     }
 
     const { container } = render(
-      <AI<typeof blogSchema>
+      <AI<typeof blogSchema, 'array'>
         schema={blogSchema}
         prompt="Generate blog posts"
         output="array"
@@ -280,14 +425,18 @@ describe('Example Components', () => {
         className={cn('blog-grid', 'custom-blog-grid')}
         itemClassName={cn('blog-item', 'custom-blog-item')}
       >
-        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>) => (
-          <article data-testid="blog-post">
-            <h2>{props.title as string}</h2>
-            <p>{props.excerpt as string}</p>
-            <div>{props.readTime as string}</div>
-            <div>{props.category as string}</div>
-            <div>{(props.tags as string[]).join(', ')}</div>
-          </article>
+        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>[]) => (
+          <>
+            {props.map((post, index) => (
+              <article key={index} data-testid="blog-post">
+                <h2>{post.title as string}</h2>
+                <p>{post.excerpt as string}</p>
+                <div>{post.readTime as string}</div>
+                <div>{post.category as string}</div>
+                <div>{(post.tags as string[]).join(', ')}</div>
+              </article>
+            ))}
+          </>
         )}
       </AI>
     )

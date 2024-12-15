@@ -26,9 +26,10 @@ const heroSchema: HeroSchema = {
 
 export function HeroSection(): JSX.Element {
   return (
-    <AI<HeroSchema>
+    <AI<HeroSchema, 'object'>
       schema={heroSchema}
       prompt="Generate a hero section for an AI-powered SaaS product waitlist landing page"
+      output="object"
       className="bg-gradient-to-br from-blue-50 to-indigo-50"
     >
       {(props: HeroSchema) => (
