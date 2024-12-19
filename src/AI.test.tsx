@@ -293,131 +293,190 @@ describe('Streaming and API Proxy', () => {
   })
 })
 
-describe('Array Output and Grid Support', () => {
-  it('renders array output with grid layout', () => {
-    const blogSchema: SchemaObject = {
-      productType: 'Blog',
-      profile: {
-        customer: 'blog readers',
-        solution: 'informative content',
-      },
-      title: 'engaging blog post title',
-      excerpt: 'compelling 2-3 sentence excerpt',
-      readTime: 'estimated read time',
-      category: 'Blog | Tutorial | Case Study | News',
-      description: 'blog post meta description',
-      tags: ['relevant topic tags'],
-    }
-
-    const { container } = render(
-      <AI<typeof blogSchema, 'array'>
-        schema={blogSchema}
-        prompt='Generate blog posts'
-        output='array'
-        cols={3}
-        gap='2rem'
-        className={cn('test-grid', 'custom-grid')}
-        itemClassName={cn('test-item', 'custom-item')}
-      >
-        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>[]) => (
-          <article data-testid='blog-item'>
-            <h2>{props[0].title as string}</h2>
-            <p>{props[0].excerpt as string}</p>
-          </article>
-        )}
-      </AI>,
-    )
-
-    // Initial render should be empty
-    expect(container.innerHTML).toBe('')
+describe('Child Component Validation', () => {
+  const mockSchema = z.object({
+    title: z.string(),
+    description: z.string().min(10, 'Description must be at least 10 characters')
   })
 
-  it('supports className merging with clsx and tailwind-merge', () => {
-    const heroSchema: SchemaObject = {
-      productType: 'App | API | Marketplace | Platform',
-      profile: {
-        customer: 'ideal customer profile',
-        solution: 'product solution',
-      },
-      headline: 'compelling headline for AI SaaS product',
-      subheadline: 'engaging subheadline explaining value proposition',
-      ctaText: 'action-oriented button text',
-      benefits: ['3-5 key benefits'],
-      description: 'product description',
-      tags: ['relevant tags'],
+  type MockSchema = z.infer<typeof mockSchema>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    global.fetch = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('validates child props and regenerates on validation error', async () => {
+    const invalidResponse = {
+      object: {
+        title: 'Test Post',
+        description: 'Too short'
+      }
     }
 
-    const { container } = render(
-      <AI<typeof heroSchema> schema={heroSchema} prompt='Generate hero section' className={cn('base-class', 'custom-class')}>
-        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>) => (
-          <div data-testid='hero-section'>
-            <h1>{props.headline as string}</h1>
-            <p>{props.subheadline as string}</p>
+    const validResponse = {
+      object: {
+        title: 'Test Post',
+        description: 'This is a proper length description that passes validation'
+      }
+    }
+
+    ;(global.fetch as MockFetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => invalidResponse,
+        status: 200,
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => validResponse,
+        status: 200,
+      } as Response)
+
+    render(
+      <AI<MockSchema, 'object'>
+        prompt='Generate a blog post'
+        schema={mockSchema}
+        validateProps={mockSchema}
+        output='object'
+      >
+        {(props: MockSchema) => (
+          <div data-testid='content'>
+            <h1>{props.title}</h1>
+            <p>{props.description}</p>
           </div>
         )}
       </AI>,
     )
 
-    // Initial render should be empty
-    expect(container.innerHTML).toBe('')
+    await waitFor(() => {
+      const content = screen.getByTestId('content')
+      expect(content).toBeInTheDocument()
+      expect(content.querySelector('p')?.textContent).toBe(
+        'This is a proper length description that passes validation'
+      )
+    })
+
+    expect(global.fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('applies grid styles in array output mode', () => {
-    const schema: SchemaObject = {
-      productType: 'App',
-      profile: {
-        customer: 'test customer',
-        solution: 'test solution',
-      },
-      description: 'test description',
-      tags: ['test'],
+  it('handles array output with validation', async () => {
+    const validResponse = {
+      object: [
+        {
+          title: 'Post 1',
+          description: 'This is a valid description for post one'
+        },
+        {
+          title: 'Post 2',
+          description: 'This is a valid description for post two'
+        }
+      ]
     }
 
-    const { container } = render(
-      <AI<typeof schema, 'array'>
-        schema={schema}
-        prompt='Generate items'
+    ;(global.fetch as MockFetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => validResponse,
+      status: 200,
+    } as Response)
+
+    render(
+      <AI<MockSchema, 'array'>
+        prompt='Generate blog posts'
+        schema={mockSchema}
+        validateProps={mockSchema}
         output='array'
-        cols={2}
-        gap='1rem'
-        className={cn('grid-container', 'custom-container')}
-        itemClassName={cn('grid-item', 'custom-item')}
+        count={2}
       >
-        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>[]) => <div>{props[0].description as string}</div>}
+        {(props: MockSchema[]) => (
+          <div>
+            {props.map((item, index) => (
+              <div key={index} data-testid={`item-${index}`}>
+                <h2>{item.title}</h2>
+                <p>{item.description}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </AI>,
     )
 
-    // Initial render should be empty
-    expect(container.innerHTML).toBe('')
+    await waitFor(() => {
+      expect(screen.getByTestId('item-0')).toBeInTheDocument()
+      expect(screen.getByTestId('item-1')).toBeInTheDocument()
+      expect(screen.getByText('This is a valid description for post one')).toBeInTheDocument()
+      expect(screen.getByText('This is a valid description for post two')).toBeInTheDocument()
+    })
   })
-})
 
-describe('Example Components', () => {
-  it('renders Hero Section with proper structure', () => {
-    const heroSchema: SchemaObject = {
-      productType: 'App',
-      profile: {
-        customer: 'ideal customer profile',
-        solution: 'product solution',
-      },
-      headline: 'compelling headline for AI SaaS product',
-      subheadline: 'engaging subheadline explaining value proposition',
-      ctaText: 'action-oriented button text',
-      benefits: ['3-5 key benefits'],
-      description: 'product description',
-      tags: ['relevant tags'],
+  it('extracts validation schema from nested objects', async () => {
+    const nestedSchema = z.object({
+      post: z.object({
+        title: z.string(),
+        content: z.object({
+          description: z.string().min(10),
+          tags: z.array(z.string()).min(1)
+        })
+      })
+    })
+
+    type NestedSchema = z.infer<typeof nestedSchema>
+
+    const invalidResponse = {
+      object: {
+        post: {
+          title: 'Test',
+          content: {
+            description: 'Short',
+            tags: []
+          }
+        }
+      }
     }
 
-    const { container } = render(
-      <AI<typeof heroSchema, 'object'> schema={heroSchema} prompt='Generate hero section' output='object' className={cn('hero-section', 'custom-hero')}>
-        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>) => (
-          <div data-testid='hero-content'>
-            <h1>{props.headline as string}</h1>
-            <p>{props.subheadline as string}</p>
-            <button>{props.ctaText as string}</button>
+    const validResponse = {
+      object: {
+        post: {
+          title: 'Test Post',
+          content: {
+            description: 'This is a proper length description',
+            tags: ['test', 'validation']
+          }
+        }
+      }
+    }
+
+
+    ;(global.fetch as MockFetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => invalidResponse,
+        status: 200,
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => validResponse,
+        status: 200,
+      } as Response)
+
+    render(
+      <AI<NestedSchema, 'object'>
+        prompt='Generate a blog post'
+        schema={nestedSchema}
+        validateProps={nestedSchema}
+        output='object'
+      >
+        {(props: NestedSchema) => (
+          <div data-testid='nested-content'>
+            <h1>{props.post.title}</h1>
+            <p>{props.post.content.description}</p>
             <ul>
-              {(props.benefits as string[]).map((benefit: string, index: number) => (
-                <li key={index}>{benefit}</li>
+              {props.post.content.tags.map((tag, index) => (
+                <li key={index}>{tag}</li>
               ))}
             </ul>
           </div>
@@ -425,51 +484,16 @@ describe('Example Components', () => {
       </AI>,
     )
 
-    // Initial render should be empty
-    expect(container.innerHTML).toBe('')
-  })
+    await waitFor(() => {
+      const content = screen.getByTestId('nested-content')
+      expect(content).toBeInTheDocument()
+      expect(content.querySelector('p')?.textContent).toBe(
+        'This is a proper length description'
+      )
+      expect(screen.getByText('test')).toBeInTheDocument()
+      expect(screen.getByText('validation')).toBeInTheDocument()
+    })
 
-  it('renders Blog List with array output', () => {
-    const blogSchema: SchemaObject = {
-      productType: 'Blog',
-      profile: {
-        customer: 'blog readers',
-        solution: 'informative content',
-      },
-      title: 'engaging blog post title',
-      excerpt: 'compelling 2-3 sentence excerpt',
-      readTime: 'estimated read time',
-      category: 'Blog | Tutorial | Case Study | News',
-      description: 'blog post description',
-      tags: ['relevant topic tags'],
-    }
-
-    const { container } = render(
-      <AI<typeof blogSchema, 'array'>
-        schema={blogSchema}
-        prompt='Generate blog posts'
-        output='array'
-        cols={3}
-        className={cn('blog-grid', 'custom-blog-grid')}
-        itemClassName={cn('blog-item', 'custom-blog-item')}
-      >
-        {(props: z.infer<ReturnType<typeof createSchemaFromObject>>[]) => (
-          <>
-            {props.map((post, index) => (
-              <article key={index} data-testid='blog-post'>
-                <h2>{post.title as string}</h2>
-                <p>{post.excerpt as string}</p>
-                <div>{post.readTime as string}</div>
-                <div>{post.category as string}</div>
-                <div>{(post.tags as string[]).join(', ')}</div>
-              </article>
-            ))}
-          </>
-        )}
-      </AI>,
-    )
-
-    // Initial render should be empty
-    expect(container.innerHTML).toBe('')
+    expect(global.fetch).toHaveBeenCalledTimes(2)
   })
 })
