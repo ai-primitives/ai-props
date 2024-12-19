@@ -209,6 +209,42 @@ function MyComponent() {
 }
 ```
 
+### Child Component Validation
+
+The AI component supports prop validation for child components through the `validateProps` prop:
+
+```tsx
+function ChildComponent({ title, description }: Props) {
+  // Define validation schema
+  const propsSchema = z.object({
+    title: z.string().min(10),
+    description: z.string().max(200)
+  })
+
+  return (
+    <AI
+      schema={schema}
+      prompt='Generate content'
+      validateProps={propsSchema}
+    >
+      {(props) => (
+        <div>
+          <h1>{props.title}</h1>
+          <p>{props.description}</p>
+        </div>
+      )}
+    </AI>
+  )
+}
+```
+
+When validation fails, the AI component will:
+1. Catch the zod validation error
+2. Extract the schema from the error
+3. Use this schema to regenerate content that matches the validation requirements
+
+This enables components to enforce strict prop requirements while leveraging AI to fix validation issues automatically.
+
 ## Default Model Configuration
 
 The AI component uses a default model configuration:
