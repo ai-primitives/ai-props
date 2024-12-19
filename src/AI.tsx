@@ -22,6 +22,7 @@ interface AIProps<T extends Record<string, unknown>, O extends 'object' | 'array
   className?: string
   itemClassName?: string
   gap?: string
+  validateProps?: z.ZodSchema<T>
   children: (props: O extends 'array' ? T[] : T) => React.ReactNode
 }
 
@@ -33,6 +34,7 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
   children,
   prompt,
   schema: rawSchema,
+  validateProps,
   model = 'gpt-4',
   output = 'object' as O,
   count,
@@ -49,8 +51,36 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
 }: AIProps<T, O>) {
   const [results, setResults] = useState<T[]>([])
   const [error, setError] = useState<Error | null>(null)
+  const [validationSchema, setValidationSchema] = useState<z.ZodSchema<T> | null>(null)
+  const [shouldRegenerate, setShouldRegenerate] = useState(false)
 
   const schema = isZodSchema(rawSchema) ? (rawSchema as z.ZodSchema<T>) : (createSchemaFromObject(rawSchema as SchemaObject) as unknown as z.ZodSchema<T>)
+
+  const handleValidation = (data: T) => {
+    if (validateProps) {
+      try {
+        validateProps.parse(data)
+        return data
+      } catch (err: unknown) {
+        // Type guard for ZodError
+        if (!(err instanceof z.ZodError)) {
+          throw err
+        }
+
+        // Now TypeScript knows err is ZodError
+        const zodError: z.ZodError = err
+        if (zodError.issues.length > 0) {
+          const extractedSchema = zodError.issues[0].path.reduce((acc: z.ZodObject<any>, path: string) =>
+            acc.shape[path], validateProps as z.ZodObject<any>)
+          setValidationSchema(extractedSchema)
+          setShouldRegenerate(true)
+          throw new Error('Validation failed. Regenerating with extracted schema...')
+        }
+        throw zodError
+      }
+    }
+    return data
+  }
 
   const gridStyle =
     output === 'array'
@@ -64,11 +94,14 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
   useEffect(() => {
     const generateProps = async () => {
       try {
-        const schemaObject = isZodSchema(schema) ? (schema.describe('') as unknown as SchemaObject) : (schema as SchemaObject)
+        // Use validation schema if available, otherwise use original schema
+        const schemaObject = validationSchema || isZodSchema(schema) ?
+          ((validationSchema || schema).describe('') as unknown as SchemaObject) :
+          (schema as SchemaObject)
 
-        const validationSchema = isZodSchema(schema)
+        const currentValidationSchema = validationSchema || (isZodSchema(schema)
           ? (schema as unknown as z.ZodSchema<T>)
-          : (createSchemaFromObject(schema as SchemaObject) as unknown as z.ZodSchema<T>)
+          : (createSchemaFromObject(schema as SchemaObject) as unknown as z.ZodSchema<T>))
 
         if (stream) {
           const { streamObject } = await import('ai')
@@ -88,9 +121,9 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
               try {
                 if (output === 'array') {
                   const arrayData = Array.isArray(chunk.object) ? chunk.object : [chunk.object]
-                  setResults(arrayData.map((item: unknown) => validationSchema.parse(item)))
+                  setResults(arrayData.map((item: unknown) => handleValidation(currentValidationSchema.parse(item))))
                 } else {
-                  setResults([validationSchema.parse(chunk.object)])
+                  setResults([handleValidation(currentValidationSchema.parse(chunk.object))])
                 }
               } catch (e) {
                 console.error('Error parsing chunk:', e)
@@ -121,7 +154,7 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
           const responseData = await response.json()
           const parsed = output === 'array' ? (Array.isArray(responseData.object) ? responseData.object : [responseData.object]) : [responseData.object]
 
-          setResults(parsed.map((item: unknown) => validationSchema.parse(item)))
+          setResults(parsed.map((item: unknown) => handleValidation(currentValidationSchema.parse(item))))
         }
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Unknown error'))
@@ -129,7 +162,8 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
     }
 
     generateProps()
-  }, [prompt, schema, model, output, count, cols, mode, experimental_telemetry, experimental_providerMetadata, stream, apiEndpoint, headers])
+    setShouldRegenerate(false)
+  }, [prompt, schema, model, output, count, cols, mode, experimental_telemetry, experimental_providerMetadata, stream, apiEndpoint, headers, shouldRegenerate, validationSchema])
 
   if (error) {
     throw error
