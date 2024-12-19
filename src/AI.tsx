@@ -56,27 +56,35 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
 
   const schema = isZodSchema(rawSchema) ? (rawSchema as z.ZodSchema<T>) : (createSchemaFromObject(rawSchema as SchemaObject) as unknown as z.ZodSchema<T>)
 
-  const handleValidation = (data: T) => {
+  const handleValidation = (data: T): T | null => {
     if (validateProps) {
       try {
         validateProps.parse(data)
         return data
       } catch (err: unknown) {
-        // Type guard for ZodError
         if (!(err instanceof z.ZodError)) {
           throw err
         }
 
-        // Now TypeScript knows err is ZodError
         const zodError: z.ZodError = err
         if (zodError.issues.length > 0) {
-          const extractedSchema = zodError.issues[0].path.reduce((acc: z.ZodObject<any>, path: string) =>
-            acc.shape[path], validateProps as z.ZodObject<any>)
-          setValidationSchema(extractedSchema)
-          setShouldRegenerate(true)
-          throw new Error('Validation failed. Regenerating with extracted schema...')
+          const extractedSchema = zodError.issues[0].path.reduce<z.ZodTypeAny>(
+            (acc, path) => {
+              if (typeof path === 'string' && acc instanceof z.ZodObject) {
+                return acc.shape[path] || acc
+              }
+              return acc
+            },
+            validateProps
+          )
+
+          if (extractedSchema instanceof z.ZodType) {
+            setValidationSchema(extractedSchema as z.ZodSchema<T>)
+            setShouldRegenerate(true)
+            return null
+          }
         }
-        throw zodError
+        return null
       }
     }
     return data
@@ -121,11 +129,31 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
               try {
                 if (output === 'array') {
                   const arrayData = Array.isArray(chunk.object) ? chunk.object : [chunk.object]
-                  setResults(arrayData.map((item: unknown) => handleValidation(currentValidationSchema.parse(item))))
+                  const validatedData = await Promise.all(
+                    arrayData.map(async (item: unknown) => {
+                      try {
+                        const validated = currentValidationSchema.parse(item)
+                        return handleValidation(validated as T)
+                      } catch (err) {
+                        if (err instanceof Error && err.message.includes('Regenerating with extracted schema')) {
+                          throw err
+                        }
+                        console.error('Validation error:', err)
+                        return null
+                      }
+                    })
+                  )
+                  const filteredResults = validatedData.filter((item): item is NonNullable<typeof item> => item !== null)
+                  setResults(filteredResults as T[])
                 } else {
-                  setResults([handleValidation(currentValidationSchema.parse(chunk.object))])
+                  const validated = currentValidationSchema.parse(chunk.object)
+                  const result = handleValidation(validated as T)
+                  if (result) setResults([result])
                 }
               } catch (e) {
+                if (e instanceof Error && e.message.includes('Regenerating with extracted schema')) {
+                  throw e
+                }
                 console.error('Error parsing chunk:', e)
               }
             }
@@ -154,7 +182,29 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
           const responseData = await response.json()
           const parsed = output === 'array' ? (Array.isArray(responseData.object) ? responseData.object : [responseData.object]) : [responseData.object]
 
-          setResults(parsed.map((item: unknown) => handleValidation(currentValidationSchema.parse(item))))
+          try {
+            const validatedData = await Promise.all(
+              parsed.map(async (item: unknown) => {
+                try {
+                  const validated = currentValidationSchema.parse(item)
+                  return handleValidation(validated as T)
+                } catch (err) {
+                  if (err instanceof Error && err.message.includes('Regenerating with extracted schema')) {
+                    throw err
+                  }
+                  console.error('Validation error:', err)
+                  return null
+                }
+              })
+            )
+            const filteredResults = validatedData.filter((item): item is NonNullable<typeof item> => item !== null)
+            setResults(filteredResults as T[])
+          } catch (err) {
+            if (err instanceof Error && err.message.includes('Regenerating with extracted schema')) {
+              throw err
+            }
+            throw err
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Unknown error'))
@@ -170,12 +220,14 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
   }
 
   if (!results.length) {
-    return null
+    return <div data-testid="loading">Generating content...</div>
   }
 
   return output === 'array' ? (
     <div style={gridStyle} className={clsx('ai-grid', className)}>
-      <div className={clsx('ai-grid-items', itemClassName)}>{children(results as O extends 'array' ? T[] : T)}</div>
+      <div data-testid="content" className={clsx('ai-grid-items', itemClassName)}>
+        {children(results as O extends 'array' ? T[] : T)}
+      </div>
     </div>
   ) : (
     children(results[0] as O extends 'array' ? T[] : T)
