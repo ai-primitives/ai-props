@@ -68,7 +68,12 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
 
         const zodError: z.ZodError = err
         if (zodError.issues.length > 0) {
-          const extractedSchema = zodError.issues[0].path.reduce<z.ZodTypeAny>(
+          // Extract schema from the deepest validation error
+          const deepestError = zodError.issues.reduce((prev, curr) =>
+            prev.path.length >= curr.path.length ? prev : curr
+          )
+
+          const extractedSchema = deepestError.path.reduce<z.ZodTypeAny>(
             (acc, path) => {
               if (typeof path === 'string' && acc instanceof z.ZodObject) {
                 return acc.shape[path] || acc
@@ -79,9 +84,11 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
           )
 
           if (extractedSchema instanceof z.ZodType) {
-            setValidationSchema(extractedSchema as z.ZodSchema<T>)
-            setShouldRegenerate(true)
-            return null
+            // Only trigger regeneration if we haven't already
+            if (!validationSchema) {
+              setValidationSchema(extractedSchema as z.ZodSchema<T>)
+              setShouldRegenerate(true)
+            }
           }
         }
         return null
@@ -220,16 +227,18 @@ export function AI<T extends Record<string, unknown>, O extends 'object' | 'arra
   }
 
   if (!results.length) {
-    return <div data-testid="loading">Generating content...</div>
+    return null
   }
 
   return output === 'array' ? (
     <div style={gridStyle} className={clsx('ai-grid', className)}>
-      <div data-testid="content" className={clsx('ai-grid-items', itemClassName)}>
+      <div data-testid={validateProps ? 'nested-content' : 'content'} className={clsx('ai-grid-items', itemClassName)}>
         {children(results as O extends 'array' ? T[] : T)}
       </div>
     </div>
   ) : (
-    children(results[0] as O extends 'array' ? T[] : T)
+    <div data-testid={validateProps ? 'nested-content' : 'content'}>
+      {children(results[0] as O extends 'array' ? T[] : T)}
+    </div>
   )
 }
